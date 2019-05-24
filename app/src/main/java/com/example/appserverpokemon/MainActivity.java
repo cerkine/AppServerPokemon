@@ -59,6 +59,14 @@ public class MainActivity extends AppCompatActivity {
         Button btnCombates = findViewById(R.id.Combates);
         Button btnRefrescarMercado = findViewById(R.id.Mercado);
         Button btnPujas = findViewById(R.id.Pujas);
+        Button btnPrepararCombate = findViewById(R.id.preparaCombate);
+
+        btnPrepararCombate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+            }
+        });
 
 
         btnCombates.setOnClickListener(new View.OnClickListener() {
@@ -85,51 +93,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-//    private void asignarPujas() {
-//
-//
-//        db.collection("Partidas").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-//            @Override
-//            public void onComplete(@NonNull Task<QuerySnapshot> task) {
-//                if (task.isSuccessful()){
-//                    Iterator<QueryDocumentSnapshot> a = task.getResult().iterator();
-//
-//                    for (QueryDocumentSnapshot snapshot: task.getResult()){
-//                        idPujas = new ArrayList<>();
-//                        for (int i = 0; i<10;i++){
-//                            idjugadores.put(i,"");
-//                            pujas.put(i,0);
-//                        }
-//
-//
-//                        Partida partida = snapshot.toObject(Partida.class);
-//                        for (int i=0;i<partida.getUsers().size(); i++){
-//                            idPujas.add(partida.getUsers().get(i).getTeamID());
-//
-//                            db.collection("Pujas").document(partida.getUsers().get(i).getTeamID()).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-//                                @Override
-//                                public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-//                                    if (task.isSuccessful()){
-//                                        Pujas listaPujas = task.getResult().toObject(Pujas.class);
-//                                        for (int j =0;j<listaPujas.getPujas().size();j++){
-//                                            if (pujas.get(j) < listaPujas.getPujas().get(j)){
-//                                                idjugadores.put(j,task.getResult().getId());
-//                                                pujas.put(j,listaPujas.getPujas().get(j));
-//                                            }
-//                                        }
-//
-//                                    }
-//                                }
-//                            });
-//                        }
-//
-//
-//                    }
-//                }
-//            }
-//        });
-//    }
-
     private void asignarPujas() {
 
         estado.setText("Wait");
@@ -140,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
                     Iterator<QueryDocumentSnapshot> a = task.getResult().iterator();
                     consultarPartidas(a);
                 }
-                estado.setText("Done");
+
             }
         });
 
@@ -148,7 +111,10 @@ public class MainActivity extends AppCompatActivity {
 
 
     void consultarPartidas(Iterator<QueryDocumentSnapshot> a){
-        if(!a.hasNext()) return;
+        if(!a.hasNext()){
+
+            return;
+        }
         Map<Integer,String> idjugadores = new HashMap<>();
         Map<Integer,Integer> pujas = new HashMap<>();
 
@@ -169,8 +135,13 @@ public class MainActivity extends AppCompatActivity {
         consultarPartidas(a);
     }
 
-    private void subirDatos(final Partida partida, Map<Integer, String> idjugadores, Map<Integer, Integer> pujas) {
-        for (int i = 0; i < idjugadores.size(); i++) {
+    private void subirDatos(final Partida partida, final int i, final Map<Integer, String> idjugadores, final Map<Integer, Integer> pujas) {
+        if (i>=idjugadores.size()){
+            refrescarMercado();
+            estado.setText("Done");
+            return;
+        }
+        Log.e("ListaPujas",String.valueOf(i)+"   "+String.valueOf(idjugadores.size()));
             if (pujas.get(i)>0){
                 final String idPujaJugador = idjugadores.get(i);
 
@@ -178,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
                     if (partida.getUsers().get(j).getPujasID().equals(idjugadores.get(i))){
                         final String idTeamJugador = partida.getUsers().get(j).getTeamID();
                         final int pokemonPos = i;
+                        final int posJugadorPartida = j;
                         db.collection("Equipos").document(idTeamJugador).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                             @Override
                             public void onComplete(@NonNull Task<DocumentSnapshot> task) {
@@ -190,6 +162,12 @@ public class MainActivity extends AppCompatActivity {
                                                 ListaPujas mercado = task.getResult().toObject(ListaPujas.class);
                                                 team.getEquipo().add(mercado.getLista().get(pokemonPos));
                                                 db.collection("Equipos").document(idTeamJugador).update("equipo", team.getEquipo());
+
+                                                partida.getUsers().get(posJugadorPartida).setMoney(partida.getUsers().get(posJugadorPartida).getMoney()-pujas.get(i));
+                                                db.collection("Partidas").document(partida.getId()).set(partida);
+
+
+                                                subirDatos(partida,i+1,idjugadores,pujas);
                                             }
                                         }
                                     });
@@ -199,14 +177,14 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-            }
-        }
+            }else subirDatos(partida,i+1,idjugadores,pujas);
+
     }
 
     void consultarPujas(final Partida partida, final int i, final Map<Integer, String> idjugadores, final Map<Integer, Integer> pujas){
 
         if(i>=partida.getUsers().size()) {
-            subirDatos(partida,idjugadores,pujas);
+            subirDatos(partida,0,idjugadores,pujas);
             return;
         }
 
@@ -226,7 +204,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                     consultarPujas(partida, i+1, idjugadores, pujas);
-
+                    Pujas pujasAZero = new Pujas();
+                    db.collection("Pujas").document(partida.getUsers().get(i).getPujasID()).set(pujasAZero);
                 }
             }
         });
